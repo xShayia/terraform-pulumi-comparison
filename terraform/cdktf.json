@@ -1,6 +1,6 @@
 {
   "language": "java",
-  "app": "./gradlew run",
+  "app": ".\\gradlew run",
   "projectId": "ae8f5314-1277-4c8d-96c2-6f589b9b487c",
   "sendCrashReports": "true",
   "codeMakerOutput": "imports",
