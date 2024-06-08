@@ -25,6 +25,7 @@ dependencies {
     implementation "com.hashicorp:cdktf-provider-docker:11.0.0"
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.junit.jupiter:junit-jupiter:5.8.0"
+    implementation 'com.hashicorp:cdktf-provider-aws:19.21.0'
 }
 
 group = "com.mycompany.app"
