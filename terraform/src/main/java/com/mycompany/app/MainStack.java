@@ -3,6 +3,11 @@ package com.mycompany.app;
 import java.util.List;
 
 import com.hashicorp.cdktf.Token;
+import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerService;
+import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceConfig;
+import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfiguration;
+import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfigurationImageRepository;
+import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfigurationImageRepositoryImageConfiguration;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistribution;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionConfig;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionDefaultCacheBehavior;
@@ -17,11 +22,16 @@ import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy_document.DataAwsIam
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy_document.DataAwsIamPolicyDocumentStatement;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy_document.DataAwsIamPolicyDocumentStatementCondition;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy_document.DataAwsIamPolicyDocumentStatementPrincipals;
+import com.hashicorp.cdktf.providers.aws.ecr_repository.EcrRepository;
+import com.hashicorp.cdktf.providers.aws.ecr_repository.EcrRepositoryConfig;
 import com.hashicorp.cdktf.providers.aws.provider.AwsProvider;
 import com.hashicorp.cdktf.providers.aws.s3_bucket.S3Bucket;
 import com.hashicorp.cdktf.providers.aws.s3_bucket.S3BucketConfig;
 import com.hashicorp.cdktf.providers.aws.s3_bucket_policy.S3BucketPolicy;
 import com.hashicorp.cdktf.providers.aws.s3_bucket_policy.S3BucketPolicyConfig;
+import com.hashicorp.cdktf.providers.docker.image.Image;
+import com.hashicorp.cdktf.providers.docker.image.ImageBuild;
+import com.hashicorp.cdktf.providers.docker.image.ImageConfig;
 import software.constructs.Construct;
 
 import com.hashicorp.cdktf.TerraformStack;
@@ -98,12 +108,35 @@ public class MainStack extends TerraformStack {
 		new S3BucketPolicy(this, "s3BucketPolicy", S3BucketPolicyConfig.builder().bucket(bucket.getBucket())
 				.policy(Token.asString(readOnlyAccess.getJson())).build());
 
+		ApprunnerService apprunnerService = new ApprunnerService(this, "apprunnerService", ApprunnerServiceConfig
+				.builder()
+				.serviceName("terraformService")
+				.sourceConfiguration(ApprunnerServiceSourceConfiguration.builder()
+						.imageRepository(ApprunnerServiceSourceConfigurationImageRepository.builder()
+								.imageConfiguration(ApprunnerServiceSourceConfigurationImageRepositoryImageConfiguration.builder()
+										.port("8000").build())
+								.imageIdentifier("public.ecr.aws/aws-containers/hello-app-runner:latest")
+								.imageRepositoryType("ECR_PUBLIC").build())
+						.autoDeploymentsEnabled(false)
+						.build()
+				)
+				.build());
+
+
 		DockerProvider.Builder.create(this, "docker")
 				.build();
-//        Image image = Image.Builder.create(this, "nginxImage")
-//                .name("nginx:latest")
-//                .keepLocally(false)
-//                .build();
+		Image image = new Image(this, "image", ImageConfig
+				.builder()
+				.name("img")
+				.buildAttribute(ImageBuild.builder()
+						.context("C:\\Users\\alitu\\IdeaProjects\\terraform-pulumi-comparison\\backend").build()
+				)
+				.build());
+
+		EcrRepository ecrRepository = new EcrRepository(this, "ecrRepository", EcrRepositoryConfig.builder()
+				.name("ecrrepo").imageTagMutability("MUTABLE").build());
+
+
 //        Container.Builder.create(this, "nginxContainer")
 //                .image(image.getName())
 //                .name("tutorial")
