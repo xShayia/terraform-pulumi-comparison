@@ -6,6 +6,7 @@ import com.hashicorp.cdktf.Token;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerService;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceConfig;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfiguration;
+import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfigurationAuthenticationConfiguration;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfigurationImageRepository;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfigurationImageRepositoryImageConfiguration;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistribution;
@@ -17,6 +18,8 @@ import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistr
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionViewerCertificate;
 import com.hashicorp.cdktf.providers.aws.cloudfront_origin_access_control.CloudfrontOriginAccessControl;
 import com.hashicorp.cdktf.providers.aws.cloudfront_origin_access_control.CloudfrontOriginAccessControlConfig;
+import com.hashicorp.cdktf.providers.aws.data_aws_ecr_authorization_token.DataAwsEcrAuthorizationToken;
+import com.hashicorp.cdktf.providers.aws.data_aws_ecr_authorization_token.DataAwsEcrAuthorizationTokenConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy_document.DataAwsIamPolicyDocument;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy_document.DataAwsIamPolicyDocumentConfig;
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy_document.DataAwsIamPolicyDocumentStatement;
@@ -24,6 +27,9 @@ import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy_document.DataAwsIam
 import com.hashicorp.cdktf.providers.aws.data_aws_iam_policy_document.DataAwsIamPolicyDocumentStatementPrincipals;
 import com.hashicorp.cdktf.providers.aws.ecr_repository.EcrRepository;
 import com.hashicorp.cdktf.providers.aws.ecr_repository.EcrRepositoryConfig;
+import com.hashicorp.cdktf.providers.aws.iam_policy_attachment.IamPolicyAttachment;
+import com.hashicorp.cdktf.providers.aws.iam_role.IamRole;
+import com.hashicorp.cdktf.providers.aws.iam_role.IamRoleConfig;
 import com.hashicorp.cdktf.providers.aws.provider.AwsProvider;
 import com.hashicorp.cdktf.providers.aws.s3_bucket.S3Bucket;
 import com.hashicorp.cdktf.providers.aws.s3_bucket.S3BucketConfig;
@@ -32,6 +38,9 @@ import com.hashicorp.cdktf.providers.aws.s3_bucket_policy.S3BucketPolicyConfig;
 import com.hashicorp.cdktf.providers.docker.image.Image;
 import com.hashicorp.cdktf.providers.docker.image.ImageBuild;
 import com.hashicorp.cdktf.providers.docker.image.ImageConfig;
+import com.hashicorp.cdktf.providers.docker.provider.DockerProviderRegistryAuth;
+import com.hashicorp.cdktf.providers.docker.registry_image.RegistryImage;
+import com.hashicorp.cdktf.providers.docker.registry_image.RegistryImageConfig;
 import software.constructs.Construct;
 
 import com.hashicorp.cdktf.TerraformStack;
@@ -108,33 +117,71 @@ public class MainStack extends TerraformStack {
 		new S3BucketPolicy(this, "s3BucketPolicy", S3BucketPolicyConfig.builder().bucket(bucket.getBucket())
 				.policy(Token.asString(readOnlyAccess.getJson())).build());
 
-		ApprunnerService apprunnerService = new ApprunnerService(this, "apprunnerService", ApprunnerServiceConfig
-				.builder()
-				.serviceName("terraformService")
-				.sourceConfiguration(ApprunnerServiceSourceConfiguration.builder()
-						.imageRepository(ApprunnerServiceSourceConfigurationImageRepository.builder()
-								.imageConfiguration(ApprunnerServiceSourceConfigurationImageRepositoryImageConfiguration.builder()
-										.port("8000").build())
-								.imageIdentifier("public.ecr.aws/aws-containers/hello-app-runner:latest")
-								.imageRepositoryType("ECR_PUBLIC").build())
-						.autoDeploymentsEnabled(false)
-						.build()
-				)
+
+		EcrRepository ecrRepository = new EcrRepository(this, "ecrRepository", EcrRepositoryConfig.builder()
+				.name("ecrrepo").imageTagMutability("MUTABLE").build());
+
+		var dataAwsEcrAuthorizationToken = new DataAwsEcrAuthorizationToken(this, "dataAwsEcrAuthorizationToken", DataAwsEcrAuthorizationTokenConfig.builder()
 				.build());
 
 
 		DockerProvider.Builder.create(this, "docker")
+				.registryAuth(List.of(DockerProviderRegistryAuth.builder()
+						.username(dataAwsEcrAuthorizationToken.getUserName())
+						.password(dataAwsEcrAuthorizationToken.getPassword())
+						.address(dataAwsEcrAuthorizationToken.getProxyEndpoint())
+						.build()))
 				.build();
+
 		Image image = new Image(this, "image", ImageConfig
 				.builder()
-				.name("img")
+				.name(ecrRepository.getRepositoryUrl())
 				.buildAttribute(ImageBuild.builder()
 						.context("C:\\Users\\alitu\\IdeaProjects\\terraform-pulumi-comparison\\backend").build()
 				)
 				.build());
 
-		EcrRepository ecrRepository = new EcrRepository(this, "ecrRepository", EcrRepositoryConfig.builder()
-				.name("ecrrepo").imageTagMutability("MUTABLE").build());
+
+		RegistryImage registryImage = new RegistryImage(this, "registryImage", RegistryImageConfig.builder()
+				.name(image.getName())
+				.keepRemotely(true)
+				.build());
+
+
+		var appRunIamRole = new DataAwsIamPolicyDocument(this, "readOnlyAccc", DataAwsIamPolicyDocumentConfig.builder()
+				.version("2012-10-17").statement(List.of(DataAwsIamPolicyDocumentStatement.builder().effect("Allow")
+						.principals(List.of(DataAwsIamPolicyDocumentStatementPrincipals.builder()
+								.type("Service")
+								.identifiers(List.of("build.apprunner.amazonaws.com"))
+								.build()))
+						.actions(List.of("sts:AssumeRole")).build()))
+				.build()
+		);
+
+
+
+
+		IamRole iamRole = new IamRole(this, "iamRole", IamRoleConfig.builder()
+				.assumeRolePolicy(Token.asString(appRunIamRole.getJson()))
+				.managedPolicyArns(List.of("arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"))
+				.build());
+
+
+		ApprunnerService apprunnerService = new ApprunnerService(this, "apprunnerService2", ApprunnerServiceConfig
+				.builder()
+				.serviceName("terraformService")
+				.sourceConfiguration(ApprunnerServiceSourceConfiguration.builder()
+						.imageRepository(ApprunnerServiceSourceConfigurationImageRepository.builder()
+								.imageConfiguration(ApprunnerServiceSourceConfigurationImageRepositoryImageConfiguration.builder()
+										.port("8080").build())
+								.imageIdentifier(image.getName() + ":latest")
+								.imageRepositoryType("ECR").build())
+						.autoDeploymentsEnabled(false)
+						.authenticationConfiguration(ApprunnerServiceSourceConfigurationAuthenticationConfiguration.builder()
+								.accessRoleArn(iamRole.getArn()).build())
+						.build()
+				)
+				.build());
 
 
 //        Container.Builder.create(this, "nginxContainer")
