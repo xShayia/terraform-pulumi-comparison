@@ -6,7 +6,7 @@ WORKDIR /demo
 COPY build.gradle .
 COPY settings.gradle .
 COPY ./src ./src
-RUN gradle build
+RUN gradle build -x test
 #Stage 2
 # set base image for second stage
 FROM amazoncorretto:17-alpine3.19

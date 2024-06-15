@@ -3,18 +3,25 @@ package com.mycompany.app;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import com.hashicorp.cdktf.Token;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerService;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceConfig;
+import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceNetworkConfiguration;
+import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceNetworkConfigurationEgressConfiguration;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfiguration;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfigurationAuthenticationConfiguration;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfigurationImageRepository;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceSourceConfigurationImageRepositoryImageConfiguration;
+import com.hashicorp.cdktf.providers.aws.apprunner_vpc_connector.ApprunnerVpcConnector;
+import com.hashicorp.cdktf.providers.aws.apprunner_vpc_connector.ApprunnerVpcConnectorConfig;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistribution;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionConfig;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionDefaultCacheBehavior;
+import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionOrderedCacheBehavior;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionOrigin;
+import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionOriginCustomOriginConfig;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionRestrictions;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionRestrictionsGeoRestriction;
 import com.hashicorp.cdktf.providers.aws.cloudfront_distribution.CloudfrontDistributionViewerCertificate;
@@ -49,6 +56,10 @@ import com.hashicorp.cdktf.providers.aws.s3_bucket.S3Bucket;
 import com.hashicorp.cdktf.providers.aws.s3_bucket.S3BucketConfig;
 import com.hashicorp.cdktf.providers.aws.s3_bucket_policy.S3BucketPolicy;
 import com.hashicorp.cdktf.providers.aws.s3_bucket_policy.S3BucketPolicyConfig;
+import com.hashicorp.cdktf.providers.aws.security_group.SecurityGroup;
+import com.hashicorp.cdktf.providers.aws.security_group.SecurityGroupConfig;
+import com.hashicorp.cdktf.providers.aws.security_group.SecurityGroupEgress;
+import com.hashicorp.cdktf.providers.aws.security_group.SecurityGroupIngress;
 import com.hashicorp.cdktf.providers.aws.subnet.Subnet;
 import com.hashicorp.cdktf.providers.aws.subnet.SubnetConfig;
 import com.hashicorp.cdktf.providers.aws.vpc.Vpc;
@@ -71,6 +82,11 @@ public class MainStack extends TerraformStack {
 		super(scope, id);
 
 		String s3originId = "S3originId";
+		String appRunnerOriginId = "AppRunneroriginId";
+
+		String usernameDB = "user";
+		String passDB = "useruser";
+		String nameDB = "mydb";
 
 
 		AwsProvider.Builder.create(this, "AWS")
@@ -82,58 +98,6 @@ public class MainStack extends TerraformStack {
 				.bucketPrefix("frontend-static")
 				.build()
 		);
-
-		CloudfrontDistribution cloudfrontDistribution = new CloudfrontDistribution(this, "cloudFront", CloudfrontDistributionConfig.builder()
-				.defaultCacheBehavior(
-						CloudfrontDistributionDefaultCacheBehavior.builder()
-								.allowedMethods(List.of("DELETE",
-										"GET",
-										"HEAD",
-										"OPTIONS",
-										"PATCH",
-										"POST",
-										"PUT"))
-								.cachedMethods(List.of("GET", "HEAD"))
-								.targetOriginId(s3originId).viewerProtocolPolicy("redirect-to-https")
-								.cachePolicyId("4135ea2d-6df8-44a3-9df3-4b5a84be39ad").build()
-				)
-				.origin(List.of(CloudfrontDistributionOrigin.builder().domainName(bucket.getBucketRegionalDomainName())
-						.originAccessControlId(
-								new CloudfrontOriginAccessControl(this, "originAccess",
-										CloudfrontOriginAccessControlConfig.builder().name("bucketOriginAccessControl")
-												.originAccessControlOriginType("s3").signingBehavior("always")
-												.signingProtocol("sigv4")
-												.build()
-								).getId()
-						).originId(s3originId).build())).enabled(true)
-				.restrictions(CloudfrontDistributionRestrictions.builder()
-						.geoRestriction(CloudfrontDistributionRestrictionsGeoRestriction.builder()
-								.restrictionType("none").build()).build())
-				.viewerCertificate(CloudfrontDistributionViewerCertificate.builder().cloudfrontDefaultCertificate(true)
-						.build())
-
-				.build());
-
-		var readOnlyAccess = new DataAwsIamPolicyDocument(this, "readOnlyAcc", DataAwsIamPolicyDocumentConfig.builder()
-				.version("2012-10-17").statement(List.of(
-						DataAwsIamPolicyDocumentStatement.builder()
-								.sid("AllowCloudFrontServicePrincipalReadOnly")
-								.effect("Allow")
-								.principals(List.of(DataAwsIamPolicyDocumentStatementPrincipals.builder()
-										.type("Service")
-										.identifiers(List.of("cloudfront.amazonaws.com"))
-										.build()))
-								.actions(List.of("s3:GetObject"))
-								.resources(List.of(bucket.getArn() + "/*"))
-								.condition(List.of(DataAwsIamPolicyDocumentStatementCondition.builder()
-										.test("StringEquals").variable("AWS:SourceArn")
-										.values(List.of(cloudfrontDistribution.getArn())).build()))
-								.build()
-				)).build());
-
-
-		new S3BucketPolicy(this, "s3BucketPolicy", S3BucketPolicyConfig.builder().bucket(bucket.getBucket())
-				.policy(Token.asString(readOnlyAccess.getJson())).build());
 
 
 		EcrRepository ecrRepository = new EcrRepository(this, "ecrRepository", EcrRepositoryConfig.builder()
@@ -157,16 +121,18 @@ public class MainStack extends TerraformStack {
 				.buildAttribute(ImageBuild.builder()
 						.context("C:\\Users\\alitu\\IdeaProjects\\terraform-pulumi-comparison\\backend").build()
 				)
+				.triggers(Map.of("1", UUID.randomUUID().toString()))
 				.build());
 
 
 		RegistryImage registryImage = new RegistryImage(this, "registryImage", RegistryImageConfig.builder()
 				.name(image.getName())
 				.keepRemotely(true)
+				.triggers(Map.of("1", image.getRepoDigest()))
 				.build());
 
 
-		var appRunIamRole = new DataAwsIamPolicyDocument(this, "readOnlyAccc", DataAwsIamPolicyDocumentConfig.builder()
+		var appRunIamRolePolicyDocument = new DataAwsIamPolicyDocument(this, "readOnlyAccc", DataAwsIamPolicyDocumentConfig.builder()
 				.version("2012-10-17").statement(List.of(DataAwsIamPolicyDocumentStatement.builder().effect("Allow")
 						.principals(List.of(DataAwsIamPolicyDocumentStatementPrincipals.builder()
 								.type("Service")
@@ -178,25 +144,8 @@ public class MainStack extends TerraformStack {
 
 
 		IamRole iamRole = new IamRole(this, "iamRole", IamRoleConfig.builder()
-				.assumeRolePolicy(Token.asString(appRunIamRole.getJson()))
+				.assumeRolePolicy(Token.asString(appRunIamRolePolicyDocument.getJson()))
 				.managedPolicyArns(List.of("arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"))
-				.build());
-
-
-		ApprunnerService apprunnerService = new ApprunnerService(this, "apprunnerService2", ApprunnerServiceConfig
-				.builder()
-				.serviceName("terraformService")
-				.sourceConfiguration(ApprunnerServiceSourceConfiguration.builder()
-						.imageRepository(ApprunnerServiceSourceConfigurationImageRepository.builder()
-								.imageConfiguration(ApprunnerServiceSourceConfigurationImageRepositoryImageConfiguration.builder()
-										.port("8080").build())
-								.imageIdentifier(image.getName() + ":latest")
-								.imageRepositoryType("ECR").build())
-						.autoDeploymentsEnabled(false)
-						.authenticationConfiguration(ApprunnerServiceSourceConfigurationAuthenticationConfiguration.builder()
-								.accessRoleArn(iamRole.getArn()).build())
-						.build()
-				)
 				.build());
 
 
@@ -248,11 +197,132 @@ public class MainStack extends TerraformStack {
 		DbSubnetGroup dbSubnetGroup = new DbSubnetGroup(this, "dbSunetGroup", DbSubnetGroupConfig.builder().name("main")
 				.subnetIds(private_subnet.stream().map(Subnet::getId).toList()).build());
 
+		SecurityGroup securityGroup = new SecurityGroup(this, "securityGroup", SecurityGroupConfig.builder()
+				.ingress(List.of(SecurityGroupIngress.builder().fromPort(0).toPort(0).protocol("-1")
+						.cidrBlocks(List.of("0.0.0.0/0")).build()))
+				.egress(List.of(SecurityGroupEgress.builder().fromPort(0).toPort(0).protocol("-1")
+						.cidrBlocks(List.of("0.0.0.0/0")).build()))
+				.vpcId(vpc.getId())
+				.build());
+
 
 		DbInstance dbInstance = new DbInstance(this, "dbInstance", DbInstanceConfig.builder().allocatedStorage(10)
-				.dbName("mydb").engine("mysql").engineVersion("8.0").instanceClass("db.t3.micro").username("user")
-				.password("useruser").parameterGroupName("default.mysql8.0").skipFinalSnapshot(true)
-				.dbSubnetGroupName(dbSubnetGroup.getName()).build());
+				.dbName(nameDB).engine("mysql").engineVersion("8.0").instanceClass("db.t3.micro").username(usernameDB)
+				.password(passDB).parameterGroupName("default.mysql8.0").skipFinalSnapshot(true)
+				.dbSubnetGroupName(dbSubnetGroup.getName()).vpcSecurityGroupIds(List.of(securityGroup.getId()))
+				.build());
+
+
+		ApprunnerVpcConnector apprunnerVpcConnector = new ApprunnerVpcConnector(this, "apprunnerVpcConnector", ApprunnerVpcConnectorConfig.builder()
+				.vpcConnectorName("name").subnets(private_subnet.stream().map(Subnet::getId).toList())
+				.securityGroups(List.of(securityGroup.getId()))
+				.build());
+
+
+		ApprunnerService apprunnerService = new ApprunnerService(this, "apprunnerService2", ApprunnerServiceConfig
+				.builder()
+				.serviceName("terraformService")
+				.sourceConfiguration(
+						ApprunnerServiceSourceConfiguration.builder()
+								.imageRepository(
+										ApprunnerServiceSourceConfigurationImageRepository.builder()
+												.imageConfiguration(
+														ApprunnerServiceSourceConfigurationImageRepositoryImageConfiguration.builder()
+																.port("8080")
+																.runtimeEnvironmentVariables(Map.of("MYSQL_HOST", dbInstance.getAddress(), "MYSQL_USER", usernameDB, "MYSQL_PASS", passDB, "MYSQL_DB", nameDB))
+																.build()
+												)
+												.imageIdentifier(image.getName() + "@" + registryImage.getSha256Digest())
+												.imageRepositoryType("ECR").build()
+								)
+								.autoDeploymentsEnabled(false)
+								.authenticationConfiguration(
+										ApprunnerServiceSourceConfigurationAuthenticationConfiguration.builder()
+												.accessRoleArn(iamRole.getArn())
+												.build()
+								)
+								.build()
+				)
+				.networkConfiguration(ApprunnerServiceNetworkConfiguration.builder()
+						.egressConfiguration(ApprunnerServiceNetworkConfigurationEgressConfiguration.builder()
+								.egressType("VPC").vpcConnectorArn(apprunnerVpcConnector.getArn()).build()).build())
+				.build());
+
+
+		CloudfrontDistribution cloudfrontDistribution = new CloudfrontDistribution(this, "cloudFront", CloudfrontDistributionConfig.builder()
+				.defaultCacheBehavior(
+						CloudfrontDistributionDefaultCacheBehavior.builder()
+								.allowedMethods(List.of("DELETE",
+										"GET",
+										"HEAD",
+										"OPTIONS",
+										"PATCH",
+										"POST",
+										"PUT"))
+								.cachedMethods(List.of("GET", "HEAD"))
+								.targetOriginId(s3originId).viewerProtocolPolicy("redirect-to-https")
+								.cachePolicyId("4135ea2d-6df8-44a3-9df3-4b5a84be39ad").build()
+				)
+				.orderedCacheBehavior(List.of(CloudfrontDistributionOrderedCacheBehavior.builder().pathPattern("/visit")
+						.allowedMethods(List.of("DELETE",
+								"GET",
+								"HEAD",
+								"OPTIONS",
+								"PATCH",
+								"POST",
+								"PUT"))
+						.cachedMethods(List.of("GET", "HEAD"))
+						.targetOriginId(appRunnerOriginId).viewerProtocolPolicy("redirect-to-https")
+								.cachePolicyId("4135ea2d-6df8-44a3-9df3-4b5a84be39ad")
+						.build()))
+				.origin(List.of(
+						CloudfrontDistributionOrigin.builder()
+								.domainName(bucket.getBucketRegionalDomainName()) //
+								.originAccessControlId(
+										new CloudfrontOriginAccessControl(this, "originAccess",
+												CloudfrontOriginAccessControlConfig.builder()
+														.name("bucketOriginAccessControl")
+														.originAccessControlOriginType("s3").signingBehavior("always")
+														.signingProtocol("sigv4")
+														.build()
+										).getId()
+								)
+								.originId(s3originId)
+								.build(),
+						CloudfrontDistributionOrigin.builder().domainName(apprunnerService.getServiceUrl())
+								.originId(appRunnerOriginId)
+								.customOriginConfig(CloudfrontDistributionOriginCustomOriginConfig.builder()
+										.httpPort(80).httpsPort(443).originProtocolPolicy("https-only")
+										.originSslProtocols(List.of("TLSv1.2")).build()).build()
+				)).enabled(true)
+				.restrictions(CloudfrontDistributionRestrictions.builder()
+						.geoRestriction(CloudfrontDistributionRestrictionsGeoRestriction.builder()
+								.restrictionType("none").build()).build())
+				.viewerCertificate(CloudfrontDistributionViewerCertificate.builder().cloudfrontDefaultCertificate(true)
+						.build())
+
+				.build());
+
+		var readOnlyAccess = new DataAwsIamPolicyDocument(this, "readOnlyAcc", DataAwsIamPolicyDocumentConfig.builder()
+				.version("2012-10-17").statement(List.of(
+						DataAwsIamPolicyDocumentStatement.builder()
+								.sid("AllowCloudFrontServicePrincipalReadOnly")
+								.effect("Allow")
+								.principals(List.of(DataAwsIamPolicyDocumentStatementPrincipals.builder()
+										.type("Service")
+										.identifiers(List.of("cloudfront.amazonaws.com"))
+										.build()))
+								.actions(List.of("s3:GetObject"))
+								.resources(List.of(bucket.getArn() + "/*"))
+								.condition(List.of(DataAwsIamPolicyDocumentStatementCondition.builder()
+										.test("StringEquals").variable("AWS:SourceArn")
+										.values(List.of(cloudfrontDistribution.getArn())).build()))
+								.build()
+				)).build());
+
+
+		new S3BucketPolicy(this, "s3BucketPolicy", S3BucketPolicyConfig.builder().bucket(bucket.getBucket())
+				.policy(Token.asString(readOnlyAccess.getJson())).build());
 
 
 //        Container.Builder.create(this, "nginxContainer")
