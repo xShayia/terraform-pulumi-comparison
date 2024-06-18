@@ -1,0 +1,7 @@
+name: pulumi-gcp
+runtime: java
+description: A minimal Google Cloud Java Pulumi program
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: gcp-java

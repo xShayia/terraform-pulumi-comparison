@@ -1,10 +1,16 @@
 package com.mycompany.app;
 
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import javax.xml.transform.Source;
+
+import com.hashicorp.cdktf.AssetType;
+import com.hashicorp.cdktf.TerraformAsset;
+import com.hashicorp.cdktf.TerraformAssetConfig;
 import com.hashicorp.cdktf.Token;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerService;
 import com.hashicorp.cdktf.providers.aws.apprunner_service.ApprunnerServiceConfig;
@@ -54,6 +60,8 @@ import com.hashicorp.cdktf.providers.aws.route_table_association.RouteTableAssoc
 import com.hashicorp.cdktf.providers.aws.route_table_association.RouteTableAssociationConfig;
 import com.hashicorp.cdktf.providers.aws.s3_bucket.S3Bucket;
 import com.hashicorp.cdktf.providers.aws.s3_bucket.S3BucketConfig;
+import com.hashicorp.cdktf.providers.aws.s3_bucket_object.S3BucketObject;
+import com.hashicorp.cdktf.providers.aws.s3_bucket_object.S3BucketObjectConfig;
 import com.hashicorp.cdktf.providers.aws.s3_bucket_policy.S3BucketPolicy;
 import com.hashicorp.cdktf.providers.aws.s3_bucket_policy.S3BucketPolicyConfig;
 import com.hashicorp.cdktf.providers.aws.security_group.SecurityGroup;
@@ -95,9 +103,25 @@ public class MainStack extends TerraformStack {
 
 
 		S3Bucket bucket = new S3Bucket(this, "bucket", S3BucketConfig.builder()
-				.bucketPrefix("frontend-static")
+				.bucketPrefix("frontend-static-terraform")
 				.build()
 		);
+
+		TerraformAsset asset = new TerraformAsset(this, "lambda-asset", TerraformAssetConfig.builder()
+				.path(Paths.get("C:\\Users\\alitu\\IdeaProjects\\terraform-pulumi-comparison\\frontend\\aws.png").toString())
+				.type(AssetType.FILE)
+				.build()
+		);
+
+		new S3BucketObject(this, "lambda-archive", S3BucketObjectConfig.builder()
+				.bucket(bucket.getBucket())
+				.key(asset.getFileName())
+				.source(asset.getPath())
+				.build()
+		);
+
+
+
 
 
 		EcrRepository ecrRepository = new EcrRepository(this, "ecrRepository", EcrRepositoryConfig.builder()
