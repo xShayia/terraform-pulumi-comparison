@@ -28,6 +28,11 @@
             <artifactId>gcp</artifactId>
             <version>(,8.0.0]</version>
         </dependency>
+        <dependency>
+            <groupId>com.pulumi</groupId>
+            <artifactId>docker</artifactId>
+            <version>4.7.0-alpha.1705607229+34a07055</version>
+        </dependency>
     </dependencies>
 
     <build>
