@@ -1,0 +1,12 @@
+{
+  "language": "java",
+  "app": ".\\gradlew run",
+  "projectId": "a07439fd-6a82-4f30-ae0a-8f2b0a8a9ffe",
+  "sendCrashReports": "true",
+  "codeMakerOutput": "imports",
+  "terraformProviders": [],
+  "terraformModules": [],
+  "context": {
+
+  }
+}
