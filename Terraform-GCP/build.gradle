@@ -24,12 +24,14 @@ dependencies {
     implementation "software.constructs:constructs:10.1.167"
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.junit.jupiter:junit-jupiter:5.8.0"
+    implementation 'com.hashicorp:cdktf-provider-google:13.24.0'
+    implementation "com.hashicorp:cdktf-provider-docker:11.0.0"
 }
 
 group = "com.mycompany.app"
 version = "0.1"
 description = "Terraform-GCP"
-java.sourceCompatibility = JavaVersion.VERSION_1_8
+java.sourceCompatibility = JavaVersion.VERSION_17
 
 
 
