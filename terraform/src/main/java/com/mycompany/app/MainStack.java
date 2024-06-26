@@ -1,5 +1,7 @@
 package com.mycompany.app;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
@@ -107,22 +109,33 @@ public class MainStack extends TerraformStack {
 				.build()
 		);
 
-		TerraformAsset asset = new TerraformAsset(this, "lambda-asset", TerraformAssetConfig.builder()
-				.path(Paths.get("C:\\Users\\alitu\\IdeaProjects\\terraform-pulumi-comparison\\frontend\\aws.png").toString())
-				.type(AssetType.FILE)
-				.build()
-		);
-
-		new S3BucketObject(this, "lambda-archive", S3BucketObjectConfig.builder()
-				.bucket(bucket.getBucket())
-				.key(asset.getFileName())
-				.source(asset.getPath())
-				.build()
-		);
-
-
-
-
+		try {
+			var files = Files.list(Paths.get("C:\\Users\\alitu\\IdeaProjects\\terraform-pulumi-comparison\\frontend\\dist\\demo-app\\browser"))
+					.filter(file -> !Files.isDirectory(file))
+					.toList();
+			files.forEach(file -> {
+				var asset = new TerraformAsset(this, file.getFileName().toString() + "asset", TerraformAssetConfig.builder()
+						.path(file.toString())
+						.type(AssetType.FILE)
+						.build()
+				);
+				var contentType = "";
+				try {
+					contentType = Files.probeContentType(file);
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+				new S3BucketObject(this, file.getFileName().toString() + "s3File", S3BucketObjectConfig.builder()
+						.bucket(bucket.getBucket())
+						.source(asset.getPath())
+						.key(file.getFileName().toString())
+						.contentType(contentType)
+						.build()
+				);
+			});
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 
 		EcrRepository ecrRepository = new EcrRepository(this, "ecrRepository", EcrRepositoryConfig.builder()
 				.name("ecrrepo").imageTagMutability("MUTABLE").build());

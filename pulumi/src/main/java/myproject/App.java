@@ -1,5 +1,7 @@
 package myproject;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,11 +92,28 @@ public class App {
 
 			var bucket = new Bucket("frontend-static-pulumi");
 
-			new BucketObject("aws.png", BucketObjectArgs.builder()
-					.bucket(bucket.id())
-					.source(new FileAsset("C:\\Users\\alitu\\IdeaProjects\\terraform-pulumi-comparison\\frontend\\aws.png"))
-					.build()
-			);
+			try {
+				var files = Files.list(Paths.get("C:\\Users\\alitu\\IdeaProjects\\terraform-pulumi-comparison\\frontend\\dist\\demo-app\\browser"))
+						.filter(file -> !Files.isDirectory(file))
+						.collect(Collectors.toList());
+				files.forEach(file -> {
+					var contentType = "";
+					try {
+						contentType = Files.probeContentType(file);
+					} catch (Exception e) {
+						throw new RuntimeException(e);
+					}
+					new BucketObject(file.getFileName().toString() + "asset", BucketObjectArgs.builder()
+							.bucket(bucket.id())
+							.key(file.getFileName().toString())
+							.source(new FileAsset(file.toString()))
+							.contentType(contentType)
+							.build()
+					);
+				});
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
 
 			var originAccessControl = new OriginAccessControl("originAccessControlId", OriginAccessControlArgs.builder()
 					.name("originAccessControlId")

@@ -1,0 +1,10 @@
+<div>
+  <button mat-flat-button (click)="onClick()">Adauga vizita</button>
+  @for (item of (entries$ | async); track item.id) {
+    <mat-card appearance="outlined">
+      <mat-card-content>{{ item.access }}</mat-card-content>
+    </mat-card>
+  }
+</div>
+
+

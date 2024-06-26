@@ -1,0 +1,21 @@
+:host {
+  display: flex;
+  justify-content: center;
+}
+
+div {
+  width: 100%;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  margin: 24px;
+}
+
+div > * {
+  margin-bottom: 24px;
+}
+
+mat-card-content {
+  display: flex;
+  justify-content: center;
+}
