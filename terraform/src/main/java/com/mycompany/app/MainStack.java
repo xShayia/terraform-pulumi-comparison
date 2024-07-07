@@ -287,6 +287,7 @@ public class MainStack extends TerraformStack {
 
 
 		CloudfrontDistribution cloudfrontDistribution = new CloudfrontDistribution(this, "cloudFront", CloudfrontDistributionConfig.builder()
+				.defaultRootObject("index.html")
 				.defaultCacheBehavior(
 						CloudfrontDistributionDefaultCacheBehavior.builder()
 								.allowedMethods(List.of("DELETE",

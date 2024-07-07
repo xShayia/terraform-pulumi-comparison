@@ -34,7 +34,7 @@ export class AppComponent implements OnInit {
 
   onClick(): void {
     this.http.post<void>(this.host + "/visit", {}).subscribe(() => {
-      this.entries$ = this.http.get<Entry[]>(this.host + "/visit");
+      this.entries$ = this.http.get<Entry[]>(this.host + "/visit"); //reinitializeaza lista (refresh)
     });
   }
 

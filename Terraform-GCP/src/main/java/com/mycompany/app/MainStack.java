@@ -71,6 +71,7 @@ import com.hashicorp.cdktf.providers.google.sql_user.SqlUser;
 import com.hashicorp.cdktf.providers.google.sql_user.SqlUserConfig;
 import com.hashicorp.cdktf.providers.google.storage_bucket.StorageBucket;
 import com.hashicorp.cdktf.providers.google.storage_bucket.StorageBucketConfig;
+import com.hashicorp.cdktf.providers.google.storage_bucket.StorageBucketWebsite;
 import com.hashicorp.cdktf.providers.google.storage_bucket_iam_binding.StorageBucketIamBinding;
 import com.hashicorp.cdktf.providers.google.storage_bucket_iam_binding.StorageBucketIamBindingConfig;
 import com.hashicorp.cdktf.providers.google.storage_bucket_object.StorageBucketObject;
@@ -99,6 +100,7 @@ public class MainStack extends TerraformStack {
 				StorageBucketConfig.builder()
 						.name("pulumi-test-124-bucket")
 						.location("EU")
+						.website(StorageBucketWebsite.builder().mainPageSuffix("index.html").build())
 						.build());
 
 		var bucketBinding = new StorageBucketIamBinding(this, "my-bucket-binding", StorageBucketIamBindingConfig.builder()

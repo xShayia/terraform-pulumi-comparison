@@ -1,6 +1,9 @@
 package myproject;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.pulumi.Pulumi;
 import com.pulumi.asset.FileAsset;
@@ -61,6 +64,7 @@ import com.pulumi.gcp.storage.BucketIAMBinding;
 import com.pulumi.gcp.storage.BucketIAMBindingArgs;
 import com.pulumi.gcp.storage.BucketObject;
 import com.pulumi.gcp.storage.BucketObjectArgs;
+import com.pulumi.gcp.storage.inputs.BucketWebsiteArgs;
 import com.pulumi.resources.CustomResourceOptions;
 
 public class App {
@@ -75,7 +79,31 @@ public class App {
 			var bucket = new Bucket("my-bucket",
 					BucketArgs.builder()
 							.location("EU")
+							.website(BucketWebsiteArgs.builder().mainPageSuffix("index.html").build())
 							.build());
+
+			try {
+				var files = Files.list(Paths.get("C:\\Users\\alitu\\IdeaProjects\\terraform-pulumi-comparison\\frontend\\dist\\demo-app\\browser"))
+						.filter(file -> !Files.isDirectory(file))
+						.collect(Collectors.toList());
+				files.forEach(file -> {
+					var contentType = "";
+					try {
+						contentType = Files.probeContentType(file);
+					} catch (Exception e) {
+						throw new RuntimeException(e);
+					}
+					new BucketObject(file.getFileName().toString() + "asset", BucketObjectArgs.builder()
+							.bucket(bucket.id())
+							.name(file.getFileName().toString())
+							.source(new FileAsset(file.toString()))
+							.contentType(contentType)
+							.build()
+					);
+				});
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
 
 			var bucketBinding = new BucketIAMBinding("my-bucket-binding", BucketIAMBindingArgs.builder()
 					.bucket(bucket.name())
@@ -172,7 +200,7 @@ public class App {
 					.launchStage("GA")
 					.template(ServiceTemplateArgs.builder()
 							.containers(ServiceTemplateContainerArgs.builder()
-									.image("europe-central2-docker.pkg.dev/constant-tracer-426820-h2/repodockergcp/imagedoc")
+									.image(image.repoDigest())
 									.envs(
 											Output.all(
 													instance.firstIpAddress()

@@ -66,6 +66,8 @@ import com.pulumi.aws.rds.SubnetGroup;
 import com.pulumi.aws.rds.SubnetGroupArgs;
 import com.pulumi.aws.s3.BucketObject;
 import com.pulumi.aws.s3.BucketObjectArgs;
+import com.pulumi.aws.s3.BucketPolicy;
+import com.pulumi.aws.s3.BucketPolicyArgs;
 import com.pulumi.core.Output;
 import com.pulumi.aws.s3.Bucket;
 import com.pulumi.docker.Image;
@@ -267,7 +269,7 @@ public class App {
 
 
 			var cloudFrontDistribution = new Distribution("cloudFrontDistribution", DistributionArgs.builder()
-
+					.defaultRootObject("index.html")
 					.origins(
 							DistributionOriginArgs.builder()
 									.domainName(bucket.bucketRegionalDomainName())
@@ -329,6 +331,33 @@ public class App {
 							.build())
 
 					.build());
+
+			var policy = new BucketPolicy("bucketpolcu", BucketPolicyArgs.builder()
+					.bucket(bucket.bucket())
+					.policy(
+							Output.all(bucket.arn(), cloudFrontDistribution.arn()).applyValue(values ->
+									serializeJson(
+											jsonObject(
+													jsonProperty("Version", "2012-10-17"),
+													jsonProperty("Statement", jsonArray(
+															jsonObject(
+																	jsonProperty("Action", "s3:GetObject"),
+																	jsonProperty("Resource", values.get(0) + "/*"),
+																	jsonProperty("Effect", "Allow"),
+																	jsonProperty("Principal", jsonObject(
+																			jsonProperty("Service", "cloudfront.amazonaws.com")
+																	)),
+																	jsonProperty("Condition", jsonObject(
+																			jsonProperty("StringEquals", jsonObject(
+																					jsonProperty("AWS:SourceArn", values.get(1))
+																			))
+																	))
+															))))
+									)
+							))
+					.build());
+
+
 
 		});
 

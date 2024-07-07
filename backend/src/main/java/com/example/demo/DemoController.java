@@ -30,7 +30,7 @@ public class DemoController {
 
 	@GetMapping(value = "/visit")
 	public List<DbEntity> getVisits(){
-		return repository.findTop5ByOrderById();
+		return repository.findTop5ByOrderByIdDesc();
 	}
 
 }
